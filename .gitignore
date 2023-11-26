@@ -1,0 +1,10 @@
+.vscode/
+
+MDK-ARM/JLinkLog.txt
+MDK-ARM/JLinkSettings.ini
+MDK-ARM/Rocket_HAL
+MDK-ARM/Rocket_HAL.uvguix.QD
+MDK-ARM/Rocket_HAL.uvguix.51618
+MDK-ARM/Rocket_HAL.uvguix.admin
+MDK-ARM/startup_stm32f103xb.lst
+
