@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ *******************************	***********************************************
+ * @attention
+ *
+ * Copyright (c) 2022 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "Include.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,18 +44,41 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//////////////////////////////////////////////////////////////////
+//				串口调用打印数据需要这段代码						//
+//////////////////////////////////////////////////////////////////
+#if 1
+#pragma import(__use_no_semihosting)
 
+struct __FILE {
+    int handle;
+};
+
+FILE __stdout;
+
+void _sys_exit(int x) {
+    x = x;
+}
+
+int fputc(int ch, FILE *f) {
+    while ((USART1->SR & 0X40) == 0)
+        ;  //????,??????
+    USART1->DR = (uint8_t)ch;
+	//HAL_UART_Transmit(&huart1, (uint8_t *)ch, 1, HAL_MAX_DELAY);
+    return ch;
+}
+#endif
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 /* USER CODE END 0 */
 
 /**
@@ -65,7 +88,10 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+    int t = 0;
 
+    float h = 0;
+    delay_init(72);  // 延时函数初始化
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -91,17 +117,40 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+    __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
+    HAL_TIM_Base_Start_IT(&htim2);
+
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);  // 开启TIM3_CH3上的PWM通道
+
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, SERVO(0));  // 设置初始角度几乎为0，18对应0°，90对应180°，数值每增加18，角度增加45°
+
+    MS561101BA_RESET();
+    MS5611_init();
+
+    for (t = 0; t < 300; t++) {
+        MS561101BA_GetTemperature();
+        MS561101BA_getPressure();
+        if (t >= 100) {
+            h = Get_High();
+            H0 += h;
+        }
+    }
+    H0 /= 200;
+	HAL_GPIO_WritePin(Init_GPIO_Port, Init_Pin, GPIO_PIN_RESET);
+    //	printf("H0=%.4f\r\n",H0);
+	
+    __HAL_TIM_CLEAR_IT(&htim3, TIM_IT_UPDATE);
+    HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+    while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -145,7 +194,28 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/**
+  * @brief  EXTI line detection callbacks.
+  * @param  GPIO_Pin: Specifies the pins connected EXTI line
+  * @retval None
+  * @note	All the GPIO EXTI_IRQHandler will call this function only, so it`s n
+            essesary to judge which Pin touch off the EXTI interrupt.
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == Run_Pin) {
+        EXTI_Interrupt();
+    }
+}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM3) {
+        TransmitHeight_Interrupt();
+    }
+
+    if (htim->Instance == TIM2) {
+        TimeControl_Interrupt();
+    }
+}
 /* USER CODE END 4 */
 
 /**
@@ -155,11 +225,10 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1) {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 
@@ -174,8 +243,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    /* User can add his own implementation to report the file name and line number,
+       ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
